@@ -7,6 +7,14 @@ resource "aws_lambda_function" "aws_lambda_cnm_responder" {
   runtime          = "python3.9"
   source_code_hash = filebase64sha256("cnm_responder.zip")
   timeout          = 300
+  vpc_config {
+    subnet_ids         = data.aws_subnets.private_application_subnets.ids
+    security_group_ids = data.aws_security_groups.vpc_default_sg.ids
+  }
+  file_system_config {
+    arn              = data.aws_efs_access_points.aws_efs_generate_ap.arns[1]
+    local_mount_path = "/mnt/data"
+  }
 }
 
 resource "aws_lambda_permission" "aws_lambda_cnm_responder_sns" {
@@ -62,6 +70,39 @@ resource "aws_iam_policy" "aws_lambda_execution_policy" {
           "logs:PutLogEvents"
         ],
         "Resource" : "arn:aws:logs:*:*:*"
+      },
+      {
+        "Sid" : "AllowVPCAccess",
+        "Effect" : "Allow",
+        "Action" : [
+          "ec2:CreateNetworkInterface"
+        ],
+        "Resource" : concat([for subnet in data.aws_subnet.private_application_subnet : subnet.arn], ["arn:aws:ec2:${var.aws_region}:${local.account_id}:*/*"])
+      },
+      {
+        "Sid" : "AllowVPCDelete",
+        "Effect" : "Allow",
+        "Action" : [
+          "ec2:DeleteNetworkInterface"
+        ],
+        "Resource" : "arn:aws:ec2:${var.aws_region}:${local.account_id}:*/*"
+      },
+      {
+        "Sid" : "AllowVPCDescribe",
+        "Effect" : "Allow",
+        "Action" : [
+          "ec2:DescribeNetworkInterfaces",
+        ],
+        "Resource" : "*"
+      },
+      {
+        "Sid" : "AllowEFSAccess",
+        "Effect" : "Allow",
+        "Action" : [
+          "elasticfilesystem:ClientMount",
+          "elasticfilesystem:ClientWrite"
+        ],
+        "Resource" : "${data.aws_efs_access_points.aws_efs_generate_ap.arns[1]}"
       },
       {
         "Sid" : "AllowListBucket",
