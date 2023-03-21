@@ -1,11 +1,13 @@
 """AWS Lambda that handles CNM responses published to an SNS Topic.
 
-Deletes successfully ingested L2P granules.
+Deletes successfully ingested L2P granules from S3 bucket and EFS.
 Logs the errors.
 """
 
 # Standard imports
+import datetime
 import logging
+import pathlib
 import sys
 
 # Third-party imports
@@ -15,13 +17,19 @@ import requests
 
 # Constants
 CMR_URL = "https://cmr.earthdata.nasa.gov/search/granules.umm_json"
+EFS = {
+    "MODIS_A": "MODIS_L2P_CORE_NETCDF",
+    "MODIS_T": "MODIS_L2P_CORE_NETCDF",
+    "VIIRS": "VIIRS_L2P_CORE_NETCDF"
+}
+OUTPUT = pathlib.Path("/mnt/data/output")
 
 def cnm_handler(event, context):
     """Handles CNM responses delivered from SNS Topic."""
     
     logger = get_logger()
     
-    # Deterime success or failure
+    # Determine success or failure
     event_response = event["response"]["status"]
     if event_response == "FAILURE":
         message = f"{event['response']['errorCode']}: {event['response']['errorMessage']}"
@@ -45,6 +53,10 @@ def cnm_handler(event, context):
         else:
             message = f"Searched failed for {granule_name} from {collection_id}." 
             log_failure(message, granule_name, event["collection"], logger)
+            
+        # Remove file from EFS output directory
+        logger.info(f"Removing {granule_name} from processor L2P output.")
+        remove_from_efs(f"{granule_name}.nc", logger)      
     
 def get_logger():
     """Return a formatted logger object."""
@@ -136,3 +148,33 @@ def report_checksum_errors(checksum_errors, logger):
     for file in checksum_errors:
         logger.error(file)
     sys.exit(1)
+    
+def remove_from_efs(granule_name, logger):
+    """Remove L2P granule from processor output directory."""
+    
+    dataset = granule_name.split('-')[4]
+    ts = datetime.datetime.strptime(granule_name.split('-')[0], "%Y%m%d%H%M%S")
+
+    granule_file = OUTPUT.joinpath(EFS[dataset], dataset, str(ts.year), str(ts.timetuple().tm_yday), granule_name)   
+    delete_file(granule_file, logger)
+        
+    checksum = OUTPUT.joinpath(EFS[dataset], dataset, str(ts.year), str(ts.timetuple().tm_yday), f"{granule_name}.md5")
+    delete_file(checksum, logger)
+    
+    granule_file_refined = OUTPUT.joinpath(EFS[dataset], f"{dataset}_REFINED", str(ts.year), str(ts.timetuple().tm_yday), granule_name)
+    delete_file(granule_file_refined, logger)
+    
+    checksum_refined = OUTPUT.joinpath(EFS[dataset], f"{dataset}_REFINED", str(ts.year), str(ts.timetuple().tm_yday), f"{granule_name}.md5")
+    delete_file(checksum_refined, logger)
+
+def delete_file(granule, logger):
+    """Determine if granule file exists and delete if it does.
+    
+    Returns granule name if does not exist else None.
+    """
+    
+    try:
+        granule.unlink()
+        logger.info(f"Removed {str(granule)} from EFS.")
+    except FileNotFoundError:
+        logger.info(f"{str(granule)} does not exist on the EFS.")
