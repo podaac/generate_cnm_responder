@@ -22,12 +22,13 @@ EFS = {
     "MODIS_T": "MODIS_L2P_CORE_NETCDF",
     "VIIRS": "VIIRS_L2P_CORE_NETCDF"
 }
-OUTPUT = pathlib.Path("/mnt/data/output")
+OUTPUT = pathlib.Path("/mnt/data")
 
 def cnm_handler(event, context):
     """Handles CNM responses delivered from SNS Topic."""
     
     logger = get_logger()
+    logger.info(f"EVENT - {event}")
     
     # Determine success or failure
     event_response = event["response"]["status"]
