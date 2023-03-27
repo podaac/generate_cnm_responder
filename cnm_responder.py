@@ -6,6 +6,7 @@ Logs the errors.
 
 # Standard imports
 import datetime
+import json
 import logging
 import pathlib
 import sys
@@ -30,15 +31,18 @@ def cnm_handler(event, context):
     logger = get_logger()
     logger.info(f"EVENT - {event}")
     
+    # Parse message
+    response = json.loads(event["Records"][0]["Sns"]["Message"])
+    
     # Determine success or failure
-    event_response = event["response"]["status"]
+    event_response = response["response"]["status"]
     if event_response == "FAILURE":
-        message = f"{event['response']['errorCode']}: {event['response']['errorMessage']}"
-        log_failure(message, event["identifier"], event["collection"], logger)
+        message = f"{response['response']['errorCode']}: {response['response']['errorMessage']}"
+        log_failure(message, response["identifier"], response["collection"], logger)
     else:
         # Search
-        collection_id = event["response"]["ingestionMetadata"]["catalogId"]
-        granule_name = event["identifier"]
+        collection_id = response["response"]["ingestionMetadata"]["catalogId"]
+        granule_name = response["identifier"]
         logger.info(f"Searching for {granule_name} from {collection_id}.")
         checksum_dict = run_query(collection_id, granule_name)
         
@@ -46,14 +50,14 @@ def cnm_handler(event, context):
         if checksum_dict:
             logger.info(f"Found {granule_name} from {collection_id}.")
             try:
-                checksum_errors = remove_staged_file(checksum_dict, event["trace"], event["product"]["files"], logger)
+                checksum_errors = remove_staged_file(checksum_dict, response["trace"], response["product"]["files"], logger)
                 # Report on any files where checksums did not match
                 if len(checksum_errors) > 0: report_checksum_errors(checksum_errors, logger)
             except botocore.exceptions.ClientError as error:
-                log_failure(error, granule_name, event["collection"], logger)
+                log_failure(error, granule_name, response["collection"], logger)
         else:
             message = f"Searched failed for {granule_name} from {collection_id}." 
-            log_failure(message, granule_name, event["collection"], logger)
+            log_failure(message, granule_name, response["collection"], logger)
             
         # Remove file from EFS output directory
         logger.info(f"Removing {granule_name} from processor L2P output.")
