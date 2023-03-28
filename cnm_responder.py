@@ -44,7 +44,7 @@ def cnm_handler(event, context):
         collection_id = response["response"]["ingestionMetadata"]["catalogId"]
         granule_name = response["identifier"]
         logger.info(f"Searching for {granule_name} from {collection_id}.")
-        checksum_dict = run_query(collection_id, granule_name)
+        checksum_dict = run_query(collection_id, granule_name, logger)
         
         # Remove file from S3 if present
         if checksum_dict:
@@ -96,7 +96,7 @@ def log_failure(message, granule, collection, logger):
     logger.error("Exiting program.")
     sys.exit(1)
 
-def run_query(collection_id, granule_name):
+def run_query(collection_id, granule_name, logger):
     """Run query on granule to see if it exists in CMR.
     
     Returns dict of file and md5 checksums or empty dict if no granule is found.
@@ -111,7 +111,10 @@ def run_query(collection_id, granule_name):
     coll = res.json()
 
     # Parse response to locate granule checksums
-    if coll["hits"] > 0:
+    if "errors" in coll.keys():
+        logger.error(f"Error response - {coll['errors']}")
+        return {}
+    elif "hits" in coll.keys() and coll["hits"] > 0:
         files = coll["items"][0]["umm"]["DataGranule"]["ArchiveAndDistributionInformation"]
         checksum_dict = {}
         for file in files:
@@ -121,6 +124,7 @@ def run_query(collection_id, granule_name):
                 checksum_dict["md5"] = file["Checksum"]["Value"]
         return checksum_dict
     else:
+        logger.error(f"Could not locate granule: {granule_name}")
         return {}
     
 def remove_staged_file(checksum_dict, prefix, file_list, logger):
