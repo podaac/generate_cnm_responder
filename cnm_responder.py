@@ -17,11 +17,15 @@ import botocore
 import requests
 
 # Constants
-CMR_URL = "https://cmr.earthdata.nasa.gov/search/granules.umm_json"
 EFS = {
     "MODIS_A": "MODIS_L2P_CORE_NETCDF",
     "MODIS_T": "MODIS_L2P_CORE_NETCDF",
     "VIIRS": "VIIRS_L2P_CORE_NETCDF"
+}
+S3 = {
+    "MODIS_A": "aqua",
+    "MODIS_T": "terra",
+    "VIIRS": "viirs"
 }
 OUTPUT = pathlib.Path("/mnt/data")
 
@@ -41,16 +45,25 @@ def cnm_handler(event, context):
         log_failure(message, response["identifier"], response["collection"], logger)
     else:
         # Search
+        if response["trace"].endswith("-sit") or response["trace"].endswith("-uat"):
+            cmr_url = "https://cmr.uat.earthdata.nasa.gov/search/granules.umm_json"
+        else:
+            cmr_url = "https://cmr.earthdata.nasa.gov/search/granules.umm_json"
         collection_id = response["response"]["ingestionMetadata"]["catalogId"]
         granule_name = response["identifier"]
+        try:
+            token = get_edl_token(response["trace"], logger)
+        except botocore.exceptions.ClientError as error:
+            log_failure(error, granule_name, response["collection"], logger)
         logger.info(f"Searching for {granule_name} from {collection_id}.")
-        checksum_dict = run_query(collection_id, granule_name, logger)
+        checksum_dict = run_query(cmr_url, collection_id, granule_name, token, logger)
         
         # Remove file from S3 if present
         if checksum_dict:
             logger.info(f"Found {granule_name} from {collection_id}.")
             try:
-                checksum_errors = remove_staged_file(checksum_dict, response["trace"], response["product"]["files"], logger)
+                dataset = S3[granule_name.split('-')[4]]
+                checksum_errors = remove_staged_file(checksum_dict, response["trace"], dataset, response["product"]["files"], logger)
                 # Report on any files where checksums did not match
                 if len(checksum_errors) > 0: report_checksum_errors(checksum_errors, logger)
             except botocore.exceptions.ClientError as error:
@@ -95,19 +108,32 @@ def log_failure(message, granule, collection, logger):
     logger.error(message)
     logger.error("Exiting program.")
     sys.exit(1)
+    
+def get_edl_token(prefix, logger):
+    """Retrieve EDL bearer token from SSM parameter store."""
+    
+    try:
+        ssm_client = boto3.client('ssm', region_name="us-west-2")
+        token = ssm_client.get_parameter(Name=f"{prefix}-edl-token", WithDecryption=True)["Parameter"]["Value"]
+        logger.info("Retrieved EDL token.")
+        return token
+    except botocore.exceptions.ClientError as error:
+        logger.error("Could not retrieve EDL credentials from SSM Parameter Store.")
+        raise error
 
-def run_query(collection_id, granule_name, logger):
+def run_query(cmr_url, collection_id, granule_name, token, logger):
     """Run query on granule to see if it exists in CMR.
     
     Returns dict of file and md5 checksums or empty dict if no granule is found.
     """
 
     # Search for granule
+    headers = { "Authorization": f"Bearer {token}" }
     params = {
         "concept_id": collection_id,
         "readable_granule_name": granule_name
     }
-    res = requests.get(url=CMR_URL, params=params)        
+    res = requests.post(url=cmr_url, headers=headers, params=params)        
     coll = res.json()
 
     # Parse response to locate granule checksums
@@ -127,21 +153,26 @@ def run_query(collection_id, granule_name, logger):
         logger.error(f"Could not locate granule: {granule_name}")
         return {}
     
-def remove_staged_file(checksum_dict, prefix, file_list, logger):
+def remove_staged_file(checksum_dict, prefix, dataset, file_list, logger):
     """Remove files that were staged in L2P granules S3 bucket."""
     
     checksum_errors = []
     for file in file_list:
-        file_type = "netcdf" if file["name"].endswith(".nc") else "md5"
+        if file["name"].endswith(".nc"):
+            file_type = "netcdf"
+        elif file["name"].endswith(".md5"):
+            file_type = "md5"
+        else:
+            continue 
         # Remove file from S3 if checksums match
         if file["checksum"] == checksum_dict[file_type]:
             try:
                 s3 = boto3.client("s3")
                 response = s3.delete_object(
                     Bucket=f"{prefix}-l2p-granules",
-                    Key=file['name']
+                    Key=f"{dataset}/{file['name']}"
                 )
-                logger.info(f"{file['name']} deleted from L2P granules staging bucket.")
+                logger.info(f"{dataset}/{file['name']} deleted from L2P granules staging bucket.")
             except botocore.exceptions.ClientError as error:
                 logger.error(f"Error encountered deleting file: {file['name']}")
                 raise error

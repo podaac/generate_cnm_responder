@@ -120,6 +120,29 @@ resource "aws_iam_policy" "aws_lambda_execution_policy" {
           "s3:DeleteObject"
         ],
         "Resource" : "${data.aws_s3_bucket.l2p_granules.arn}/*"
+      },
+      {
+        "Sid" : "DescribeParameters",
+        "Effect" : "Allow",
+        "Action" : "ssm:DescribeParameters",
+        "Resource" : "*"
+      },
+      {
+        "Sid" : "GetParameter",
+        "Effect" : "Allow",
+        "Action" : [
+          "ssm:GetParameter*"
+        ],
+        "Resource" : "${data.aws_ssm_parameter.edl_token.arn}"
+      },
+      {
+        "Sid" : "DecryptKey",
+        "Effect" : "Allow",
+        "Action" : [
+          "kms:DescribeKey",
+          "kms:Decrypt"
+        ],
+        "Resource" : "${data.aws_kms_key.ssm_key.arn}"
       }
     ]
   })

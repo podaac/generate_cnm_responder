@@ -33,6 +33,10 @@ data "aws_efs_file_system" "aws_efs_generate" {
   creation_token = var.prefix
 }
 
+data "aws_kms_key" "ssm_key" {
+  key_id = "alias/aws/ssm"
+}
+
 data "aws_s3_bucket" "l2p_granules" {
   bucket = "${var.prefix}-l2p-granules"
 }
@@ -50,6 +54,10 @@ data "aws_security_groups" "vpc_default_sg" {
 
 data "aws_sns_topic" "cnm_response" {
   name = "${var.prefix}-cnm-response"
+}
+
+data "aws_ssm_parameter" "edl_token" {
+  name = "${var.prefix}-edl-token"
 }
 
 data "aws_subnet" "private_application_subnet" {
