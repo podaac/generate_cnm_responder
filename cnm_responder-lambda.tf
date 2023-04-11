@@ -143,6 +143,22 @@ resource "aws_iam_policy" "aws_lambda_execution_policy" {
           "kms:Decrypt"
         ],
         "Resource" : "${data.aws_kms_key.ssm_key.arn}"
+      },
+      {
+        "Sid" : "AllowPublishToTopic",
+        "Effect" : "Allow",
+        "Action" : [
+          "sns:Publish"
+        ],
+        "Resource" : "${data.aws_sns_topic.batch_job_failure.arn}"
+      },
+      {
+        "Sid" : "AllowListTopics",
+        "Effect" : "Allow",
+        "Action" : [
+          "sns:ListTopics"
+        ],
+        "Resource" : "*"
       }
     ]
   })

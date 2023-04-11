@@ -52,6 +52,10 @@ data "aws_security_groups" "vpc_default_sg" {
   }
 }
 
+data "aws_sns_topic" "batch_job_failure" {
+  name = "${var.prefix}-batch-job-failure"
+}
+
 data "aws_sns_topic" "cnm_response" {
   name = "${var.prefix}-cnm-response"
 }

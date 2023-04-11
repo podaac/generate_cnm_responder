@@ -28,6 +28,7 @@ S3 = {
     "VIIRS": "viirs"
 }
 OUTPUT = pathlib.Path("/mnt/data")
+TOPIC_STRING = "batch-job-failure"
 
 def cnm_handler(event, context):
     """Handles CNM responses delivered from SNS Topic."""
@@ -42,9 +43,10 @@ def cnm_handler(event, context):
     event_response = response["response"]["status"]
     if event_response == "FAILURE":
         message = f"{response['response']['errorCode']}: {response['response']['errorMessage']}"
-        log_failure(message, response["identifier"], response["collection"], logger)
+        handle_failure(message, response["identifier"], response["collection"], logger)
     else:
         # Search
+        logger.info(f"Granule possibly ingested for: {response['collection']}. Confirming now.")
         if response["trace"].endswith("-sit") or response["trace"].endswith("-uat"):
             cmr_url = "https://cmr.uat.earthdata.nasa.gov/search/granules.umm_json"
         else:
@@ -54,7 +56,7 @@ def cnm_handler(event, context):
         try:
             token = get_edl_token(response["trace"], logger)
         except botocore.exceptions.ClientError as error:
-            log_failure(error, granule_name, response["collection"], logger)
+            handle_failure(error, granule_name, response["collection"], logger)
         logger.info(f"Searching for {granule_name} from {collection_id}.")
         checksum_dict = run_query(cmr_url, collection_id, granule_name, token, logger)
         
@@ -67,10 +69,10 @@ def cnm_handler(event, context):
                 # Report on any files where checksums did not match
                 if len(checksum_errors) > 0: report_checksum_errors(checksum_errors, logger)
             except botocore.exceptions.ClientError as error:
-                log_failure(error, granule_name, response["collection"], logger)
+                handle_failure(error, granule_name, response["collection"], logger)
         else:
             message = f"Searched failed for {granule_name} from {collection_id}." 
-            log_failure(message, granule_name, response["collection"], logger)
+            handle_failure(message, granule_name, response["collection"], logger)
             
         # Remove file from EFS output directory
         logger.info(f"Removing {granule_name} from processor L2P output.")
@@ -101,13 +103,47 @@ def get_logger():
     # Return logger
     return logger
 
-def log_failure(message, granule, collection, logger):
-    """Log CNM response failure message."""
+def handle_failure(message, granule, collection, logger):
+    """Log CNM response failure message and send a notification."""
     
     logger.error(f"Cumulus ingestion failed for {granule} in {collection}")
     logger.error(message)
+    error_message = f"Cumulus ingestion failed for {granule} in {collection}.\n" \
+        + message
+    publish_event(error_message, logger)
     logger.error("Exiting program.")
     sys.exit(1)
+    
+def publish_event(error_msg, logger):
+    """Publish event to SNS Topic."""
+    
+    sns = boto3.client("sns")
+    
+    # Get topic ARN
+    try:
+        topics = sns.list_topics()
+    except botocore.exceptions.ClientError as e:
+        logger.error("Failed to list SNS Topics.")
+        logger.error(f"Error - {e}")
+        sys.exit(1)
+    for topic in topics["Topics"]:
+        if TOPIC_STRING in topic["TopicArn"]:
+            topic_arn = topic["TopicArn"]
+            
+    # Publish to topic
+    subject = f"Generate Failure: CNM Responder"
+    try:
+        response = sns.publish(
+            TopicArn = topic_arn,
+            Message = error_msg,
+            Subject = subject
+        )
+    except botocore.exceptions.ClientError as e:
+        logger.error(f"Failed to publish to SNS Topic: {topic_arn}.")
+        logger.error(f"Error - {e}")
+        sys.exit(1)
+    
+    logger.info(f"Message published to SNS Topic: {topic_arn}.")
     
 def get_edl_token(prefix, logger):
     """Retrieve EDL bearer token from SSM parameter store."""
