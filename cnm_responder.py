@@ -69,7 +69,9 @@ def cnm_handler(event, context):
         if checksum_dict:
             logger.info(f"Found {granule_name} from {collection}.")
             try:
-                dataset = S3[granule_name.split('-')[4]]
+                d_name = granule_name.split('-')[4]
+                if "VIIRS" in d_name: d_name = d_name.replace("_NPP", "")
+                dataset = S3[d_name]
                 checksum_errors = remove_staged_file(checksum_dict, response["trace"], dataset, response["product"]["files"], logger)
                 # Report on any files where checksums did not match
                 if len(checksum_errors) > 0: report_checksum_errors(checksum_errors, logger)
@@ -234,6 +236,7 @@ def remove_from_efs(granule_name, logger):
     """Remove L2P granule from processor output directory."""
     
     dataset = granule_name.split('-')[4]
+    if "VIIRS" in dataset: dataset = dataset.replace("_NPP", "")
     ts = datetime.datetime.strptime(granule_name.split('-')[0], "%Y%m%d%H%M%S")
 
     granule_file = OUTPUT.joinpath(EFS[dataset], dataset, str(ts.year), str(ts.timetuple().tm_yday), granule_name)   
