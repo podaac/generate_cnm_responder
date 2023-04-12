@@ -27,6 +27,11 @@ S3 = {
     "MODIS_T": "terra",
     "VIIRS": "viirs"
 }
+DATASET_DICT = {
+    "MODIS_A": "MODIS_A-JPL-L2P-v2019.0",
+    "MODIS_T": "MODIS_T-JPL-L2P-v2019.0",
+    "VIIRS": "VIIRS_NPP-JPL-L2P-v2016.2"
+}
 OUTPUT = pathlib.Path("/mnt/data")
 TOPIC_STRING = "batch-job-failure"
 
@@ -38,41 +43,41 @@ def cnm_handler(event, context):
     
     # Parse message
     response = json.loads(event["Records"][0]["Sns"]["Message"])
+    collection = response["collection"]
     
     # Determine success or failure
     event_response = response["response"]["status"]
     if event_response == "FAILURE":
         message = f"{response['response']['errorCode']}: {response['response']['errorMessage']}"
-        handle_failure(message, response["identifier"], response["collection"], logger)
+        handle_failure(message, response["identifier"], collection, logger)
     else:
         # Search
-        logger.info(f"Granule possibly ingested for: {response['collection']}. Confirming now.")
+        logger.info(f"Granule possibly ingested for: {collection}. Confirming now.")
         if response["trace"].endswith("-sit") or response["trace"].endswith("-uat"):
             cmr_url = "https://cmr.uat.earthdata.nasa.gov/search/granules.umm_json"
         else:
             cmr_url = "https://cmr.earthdata.nasa.gov/search/granules.umm_json"
-        collection_id = response["response"]["ingestionMetadata"]["catalogId"]
         granule_name = response["identifier"]
         try:
             token = get_edl_token(response["trace"], logger)
         except botocore.exceptions.ClientError as error:
-            handle_failure(error, granule_name, response["collection"], logger)
-        logger.info(f"Searching for {granule_name} from {collection_id}.")
-        checksum_dict = run_query(cmr_url, collection_id, granule_name, token, logger)
+            handle_failure(error, granule_name, collection, logger)
+        logger.info(f"Searching for {granule_name} from {collection}.")
+        checksum_dict = run_query(cmr_url, collection, granule_name, token, logger)
         
         # Remove file from S3 if present
         if checksum_dict:
-            logger.info(f"Found {granule_name} from {collection_id}.")
+            logger.info(f"Found {granule_name} from {collection}.")
             try:
                 dataset = S3[granule_name.split('-')[4]]
                 checksum_errors = remove_staged_file(checksum_dict, response["trace"], dataset, response["product"]["files"], logger)
                 # Report on any files where checksums did not match
                 if len(checksum_errors) > 0: report_checksum_errors(checksum_errors, logger)
             except botocore.exceptions.ClientError as error:
-                handle_failure(error, granule_name, response["collection"], logger)
+                handle_failure(error, granule_name, collection, logger)
         else:
-            message = f"Searched failed for {granule_name} from {collection_id}." 
-            handle_failure(message, granule_name, response["collection"], logger)
+            message = f"Searched failed for {granule_name} from {collection}." 
+            handle_failure(message, granule_name, collection, logger)
             
         # Remove file from EFS output directory
         logger.info(f"Removing {granule_name} from processor L2P output.")
@@ -157,7 +162,7 @@ def get_edl_token(prefix, logger):
         logger.error("Could not retrieve EDL credentials from SSM Parameter Store.")
         raise error
 
-def run_query(cmr_url, collection_id, granule_name, token, logger):
+def run_query(cmr_url, collection, granule_name, token, logger):
     """Run query on granule to see if it exists in CMR.
     
     Returns dict of file and md5 checksums or empty dict if no granule is found.
@@ -166,7 +171,7 @@ def run_query(cmr_url, collection_id, granule_name, token, logger):
     # Search for granule
     headers = { "Authorization": f"Bearer {token}" }
     params = {
-        "concept_id": collection_id,
+        "short_name": collection,
         "readable_granule_name": granule_name
     }
     res = requests.post(url=cmr_url, headers=headers, params=params)        
