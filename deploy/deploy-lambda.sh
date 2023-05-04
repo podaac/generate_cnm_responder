@@ -12,7 +12,7 @@ FUNCTION_NAME=$1
 APP_NAME=$2
 
 ROOT_PATH="$PWD"
-ZIP_PATH=$ROOT_PATH/$APP_NAME.zip
+ZIP_PATH=fileb://$ROOT_PATH/$APP_NAME.zip
 
 response=$(aws lambda update-function-code --function-name $FUNCTION_NAME --zip-file $ZIP_PATH)
 
