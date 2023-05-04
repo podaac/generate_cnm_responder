@@ -96,6 +96,6 @@ jobs:
       - name: Deploy Terraform
         run: terraform apply -auto-approve
 
-      # Deploy Lambda Zip package
-      - name: Deploy Zip Package
-        run: deploy/deploy-lambda.sh ${PREFIX_ENV}-${APP_NAME_ENV} ${SCRIPT_NAME_ENV}
+      # # Deploy Lambda Zip package
+      # - name: Deploy Zip Package
+      #   run: deploy/deploy-lambda.sh ${PREFIX_ENV}-${APP_NAME_ENV} ${SCRIPT_NAME_ENV}

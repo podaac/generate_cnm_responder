@@ -13,6 +13,9 @@ ROOT_PATH="$PWD"
 ZIP_PATH=$ROOT_PATH/$APP_NAME.zip
 APP_PATH=$ROOT_PATH/$APP_NAME.py
 
+cat_response=$(cat $ROOT_PATH/$APP_NAME.py)
+echo CAT: $cat_response
+
 # Install dependencies
 pip install --target $ROOT_PATH/package requests
 
