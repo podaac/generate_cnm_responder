@@ -21,6 +21,5 @@ zip -r ../$APP_NAME.zip .
 
 # Zip script
 cd ..
-echo $(ls $ROOT_PATH)
 zip $APP_NAME.zip $APP_NAME.py
 echo "Created: $APP_NAME.zip."
