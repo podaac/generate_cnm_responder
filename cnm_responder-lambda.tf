@@ -4,7 +4,7 @@ resource "aws_lambda_function" "aws_lambda_cnm_responder" {
   function_name    = "${var.prefix}-cnm-responder"
   role             = aws_iam_role.aws_lambda_execution_role.arn
   handler          = "cnm_responder.cnm_handler"
-  runtime          = "python3.10"
+  runtime          = "python3.9"
   source_code_hash = filebase64sha256("${path.module}/cnm_responder.zip")
   timeout          = 300
   vpc_config {
