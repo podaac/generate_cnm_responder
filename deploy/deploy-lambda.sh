@@ -10,19 +10,16 @@
 APP_NAME=$1
 ROOT_PATH="$PWD"
 
-ZIP_PATH=$ROOT_PATH/$APP_NAME.zip
-APP_PATH=$ROOT_PATH/$APP_NAME.py
-
 # Install dependencies
 pip install --target $ROOT_PATH/package requests
 
 # Zip dependencies
 mkdir -p $ROOT_PATH/package
 cd $ROOT_PATH/package
-zip -r $ZIP_PATH .
+zip -r $ROOT_PATH/$APP_NAME.zip .
 
 # Zip script
 cd $ROOT_PATH
 echo $(ls $ROOT_PATH)
-zip -u $ZIP_PATH $APP_PATH
+zip -u $APP_NAME.zip $APP_NAME.py
 echo "Created: $ZIP_PATH."
