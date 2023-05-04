@@ -14,7 +14,6 @@ ROOT_PATH="$PWD"
 pip install --target ./package requests
 
 # Zip dependencies
-
 cd package/
 zip -r ../$APP_NAME.zip .
 
