@@ -21,6 +21,6 @@ cd $ROOT_PATH/package
 zip -r $ZIP_PATH .
 
 # Zip script
-cd ..
+cd $ROOT_PATH
 zip $ZIP_PATH $APP_PATH
 echo "Created: $ZIP_PATH."
