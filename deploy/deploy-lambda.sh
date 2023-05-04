@@ -22,5 +22,5 @@ zip -r $ZIP_PATH .
 
 # Zip script
 cd $ROOT_PATH
-zip $ZIP_PATH $APP_PATH
+zip -ur $ZIP_PATH $APP_PATH
 echo "Created: $ZIP_PATH."
