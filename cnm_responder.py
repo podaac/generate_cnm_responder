@@ -199,6 +199,7 @@ def run_query(cmr_url, collection, granule_name, token, logger):
 def remove_staged_file(checksum_dict, prefix, dataset, file_list, logger):
     """Remove files that were staged in L2P granules S3 bucket."""
     
+    logger.info(f"Remove L2P granules from S3 bucket: {prefix}-l2p-granules/{dataset}.")
     checksum_errors = []
     for file in file_list:
         if file["name"].endswith(".nc"):
@@ -215,7 +216,7 @@ def remove_staged_file(checksum_dict, prefix, dataset, file_list, logger):
                     Bucket=f"{prefix}-l2p-granules",
                     Key=f"{dataset}/{file['name']}"
                 )
-                logger.info(f"s3://{prefix}-l2p-granules/{dataset}/{file['name']} deleted.")
+                logger.info(f"Deleted: s3://{prefix}-l2p-granules/{dataset}/{file['name']}.")
             except botocore.exceptions.ClientError as error:
                 logger.error(f"Error encountered deleting file: s3://{prefix}-l2p-granules/{dataset}/{file['name']}")
                 raise error
