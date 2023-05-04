@@ -17,10 +17,12 @@ APP_PATH=$ROOT_PATH/$APP_NAME.py
 pip install --target $ROOT_PATH/package requests
 
 # Zip dependencies
+mkdir -p $ROOT_PATH/package
 cd $ROOT_PATH/package
 zip -r $ZIP_PATH .
 
 # Zip script
 cd $ROOT_PATH
-zip -vur $ZIP_PATH $APP_PATH
+echo $(ls $ROOT_PATH)
+zip -u $ZIP_PATH $APP_PATH
 echo "Created: $ZIP_PATH."
