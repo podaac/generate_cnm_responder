@@ -54,7 +54,7 @@ jobs:
 
       # Create Lambda zip deployment
       - name: Create Lambda Zip Package
-        run: deploy/deploy-zip.sh ${SCRIPT_NAME_ENV}
+        run: deploy/deploy-lambda.sh ${SCRIPT_NAME_ENV}
         
       - name: Upload zip package
         uses: actions/upload-artifact@v3.1.0
@@ -95,7 +95,3 @@ jobs:
       # Deploy Terraform
       - name: Deploy Terraform
         run: terraform apply -auto-approve
-
-      # # Deploy Lambda Zip package
-      # - name: Deploy Zip Package
-      #   run: deploy/deploy-lambda.sh ${PREFIX_ENV}-${APP_NAME_ENV} ${SCRIPT_NAME_ENV}

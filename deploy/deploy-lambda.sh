@@ -1,21 +1,26 @@
 #!/bin/bash
 #
-# Script to deploy a zipped package to an AWS Lambda Function
+# Script to create a zipped deployment package for a Lambda function.
 #
 # Command line arguments:
-# [1] function_name: Name of AWS Lambda function name
-# [2] app_name: Name of application for zipped deployment
+# [1] app_name: Name of application to create a zipped deployment package for
 # 
-# Example usage: ./delpoy-lambda.sh "my-lambda-function" "my-app-name"
+# Example usage: ./delpoy-lambda.sh "my-app-name"
 
-FUNCTION_NAME=$1
-APP_NAME=$2
-
+APP_NAME=$1
 ROOT_PATH="$PWD"
-ZIP_PATH=fileb://$ROOT_PATH/$APP_NAME.zip
 
-response=$(aws lambda update-function-code --function-name $FUNCTION_NAME --zip-file $ZIP_PATH)
+ZIP_PATH=$ROOT_PATH/$APP_NAME.zip
+APP_PATH=$ROOT_PATH/$APP_NAME.py
 
-aws lambda wait function-updated-v2 --function-name $FUNCTION_NAME
+# Install dependencies
+pip install --target $ROOT_PATH/package requests
 
-echo "Zipped package has been deployed to Lambda."
+# Zip dependencies
+cd $ROOT_PATH/package
+zip -r $ZIP_PATH .
+
+# Zip script
+cd ..
+zip $ZIP_PATH $APP_PATH
+echo "Created: $ZIP_PATH."
