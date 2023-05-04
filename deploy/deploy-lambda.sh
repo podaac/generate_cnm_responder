@@ -11,7 +11,6 @@ APP_NAME=$1
 ROOT_PATH="$PWD"
 
 # Install dependencies
-mkdir -p $ROOT_PATH/package
 pip install --target ./package requests
 
 # Zip dependencies
