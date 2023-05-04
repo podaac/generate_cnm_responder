@@ -1,4 +1,4 @@
-"""AWS Lambda that handles CNM responses published to an SNS Topic.
+"""CHANGED? AWS Lambda that handles CNM responses published to an SNS Topic.
 
 Deletes successfully ingested L2P granules from S3 bucket and EFS.
 Logs the errors.
