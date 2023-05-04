@@ -1,11 +1,11 @@
 # AWS Lambda function
 resource "aws_lambda_function" "aws_lambda_cnm_responder" {
-  filename         = "cnm_responder.zip"
+  filename         = "${path.module}/../cnm_responder.zip"
   function_name    = "${var.prefix}-cnm-responder"
   role             = aws_iam_role.aws_lambda_execution_role.arn
   handler          = "cnm_responder.cnm_handler"
   runtime          = "python3.9"
-  source_code_hash = filebase64sha256("cnm_responder.zip")
+  source_code_hash = filebase64sha256("${path.module}/../cnm_responder.zip")
   timeout          = 300
   vpc_config {
     subnet_ids         = data.aws_subnets.private_application_subnets.ids
