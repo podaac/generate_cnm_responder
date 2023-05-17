@@ -117,40 +117,8 @@ def handle_failure(message, granule, collection, logger):
     logger.error(message)
     error_message = f"Cumulus ingestion failed for {granule} in {collection}.\n" \
         + message
-    publish_event(error_message, logger)
-    logger.error("Exiting program.")
+    logger.error("Exiting program in error state.")
     sys.exit(1)
-    
-def publish_event(error_msg, logger):
-    """Publish event to SNS Topic."""
-    
-    sns = boto3.client("sns")
-    
-    # Get topic ARN
-    try:
-        topics = sns.list_topics()
-    except botocore.exceptions.ClientError as e:
-        logger.error("Failed to list SNS Topics.")
-        logger.error(f"Error - {e}")
-        sys.exit(1)
-    for topic in topics["Topics"]:
-        if TOPIC_STRING in topic["TopicArn"]:
-            topic_arn = topic["TopicArn"]
-            
-    # Publish to topic
-    subject = f"Generate Failure: CNM Responder"
-    try:
-        response = sns.publish(
-            TopicArn = topic_arn,
-            Message = error_msg,
-            Subject = subject
-        )
-    except botocore.exceptions.ClientError as e:
-        logger.error(f"Failed to publish to SNS Topic: {topic_arn}.")
-        logger.error(f"Error - {e}")
-        sys.exit(1)
-    
-    logger.info(f"Message published to SNS Topic: {topic_arn}.")
     
 def get_edl_token(prefix, logger):
     """Retrieve EDL bearer token from SSM parameter store."""
