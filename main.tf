@@ -18,19 +18,14 @@ provider "aws" {
   ignore_tags {
     key_prefixes = ["gsfc-ngap"]
   }
-  region  = var.aws_region
-  profile = var.profile
+  region = var.aws_region
 }
 
 # Data sources
 data "aws_caller_identity" "current" {}
 
-data "aws_efs_access_points" "aws_efs_generate_ap" {
-  file_system_id = data.aws_efs_file_system.aws_efs_generate.id
-}
-
-data "aws_efs_file_system" "aws_efs_generate" {
-  creation_token = var.prefix
+data "aws_efs_access_point" "fsap_cnm" {
+  access_point_id = var.fsap_id
 }
 
 data "aws_kms_key" "ssm_key" {

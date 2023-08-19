@@ -62,12 +62,12 @@ def cnm_handler(event, context):
             token = get_edl_token(response["trace"], logger)
         except botocore.exceptions.ClientError as error:
             handle_failure(error, granule_name, collection, logger)
-        logger.info(f"Searching for {granule_name} from {collection}.")
+        logger.info(f"Searching for {granule_name} from {collection} in CMR.")
         checksum_dict = run_query(cmr_url, collection, granule_name, token, logger)
         
         # Remove file from S3 if present
         if checksum_dict:
-            logger.info(f"Found {granule_name} from {collection}.")
+            logger.info(f"Found {granule_name} from {collection} in CMR.")
             try:
                 d_name = granule_name.split('-')[4]
                 if "VIIRS" in d_name: d_name = d_name.replace("_NPP", "")
@@ -78,7 +78,7 @@ def cnm_handler(event, context):
             except botocore.exceptions.ClientError as error:
                 handle_failure(error, granule_name, collection, logger)
         else:
-            message = f"Searched failed for {granule_name} from {collection}." 
+            message = f"Searched failed for {granule_name} from {collection} in CMR." 
             handle_failure(message, granule_name, collection, logger)
             
         # Remove file from EFS output directory
@@ -101,7 +101,7 @@ def get_logger():
     console_handler = logging.StreamHandler()
 
     # Create a formatter and add it to the handler
-    console_format = logging.Formatter("%(asctime)s - %(module)s - %(levelname)s : %(message)s")
+    console_format = logging.Formatter("%(module)s - %(levelname)s : %(message)s")
     console_handler.setFormatter(console_format)
 
     # Add handlers to logger
@@ -117,40 +117,8 @@ def handle_failure(message, granule, collection, logger):
     logger.error(message)
     error_message = f"Cumulus ingestion failed for {granule} in {collection}.\n" \
         + message
-    publish_event(error_message, logger)
-    logger.error("Exiting program.")
+    logger.error("Exiting program in error state.")
     sys.exit(1)
-    
-def publish_event(error_msg, logger):
-    """Publish event to SNS Topic."""
-    
-    sns = boto3.client("sns")
-    
-    # Get topic ARN
-    try:
-        topics = sns.list_topics()
-    except botocore.exceptions.ClientError as e:
-        logger.error("Failed to list SNS Topics.")
-        logger.error(f"Error - {e}")
-        sys.exit(1)
-    for topic in topics["Topics"]:
-        if TOPIC_STRING in topic["TopicArn"]:
-            topic_arn = topic["TopicArn"]
-            
-    # Publish to topic
-    subject = f"Generate Failure: CNM Responder"
-    try:
-        response = sns.publish(
-            TopicArn = topic_arn,
-            Message = error_msg,
-            Subject = subject
-        )
-    except botocore.exceptions.ClientError as e:
-        logger.error(f"Failed to publish to SNS Topic: {topic_arn}.")
-        logger.error(f"Error - {e}")
-        sys.exit(1)
-    
-    logger.info(f"Message published to SNS Topic: {topic_arn}.")
     
 def get_edl_token(prefix, logger):
     """Retrieve EDL bearer token from SSM parameter store."""
@@ -158,7 +126,7 @@ def get_edl_token(prefix, logger):
     try:
         ssm_client = boto3.client('ssm', region_name="us-west-2")
         token = ssm_client.get_parameter(Name=f"{prefix}-edl-token", WithDecryption=True)["Parameter"]["Value"]
-        logger.info("Retrieved EDL token.")
+        logger.info("Retrieved EDL token from SSM Parameter Store.")
         return token
     except botocore.exceptions.ClientError as error:
         logger.error("Could not retrieve EDL credentials from SSM Parameter Store.")
@@ -181,7 +149,7 @@ def run_query(cmr_url, collection, granule_name, token, logger):
 
     # Parse response to locate granule checksums
     if "errors" in coll.keys():
-        logger.error(f"Error response - {coll['errors']}")
+        logger.error(f"Search error response - {coll['errors']}")
         return {}
     elif "hits" in coll.keys() and coll["hits"] > 0:
         files = coll["items"][0]["umm"]["DataGranule"]["ArchiveAndDistributionInformation"]
@@ -193,12 +161,13 @@ def run_query(cmr_url, collection, granule_name, token, logger):
                 checksum_dict["md5"] = file["Checksum"]["Value"]
         return checksum_dict
     else:
-        logger.error(f"Could not locate granule: {granule_name}")
+        logger.error(f"Could not locate granule in CMR: {granule_name}")
         return {}
     
 def remove_staged_file(checksum_dict, prefix, dataset, file_list, logger):
     """Remove files that were staged in L2P granules S3 bucket."""
     
+    logger.info(f"Remove L2P granules from S3 bucket: {prefix}-l2p-granules/{dataset}.")
     checksum_errors = []
     for file in file_list:
         if file["name"].endswith(".nc"):
@@ -215,9 +184,9 @@ def remove_staged_file(checksum_dict, prefix, dataset, file_list, logger):
                     Bucket=f"{prefix}-l2p-granules",
                     Key=f"{dataset}/{file['name']}"
                 )
-                logger.info(f"{dataset}/{file['name']} deleted from L2P granules staging bucket.")
+                logger.info(f"Deleted: s3://{prefix}-l2p-granules/{dataset}/{file['name']}.")
             except botocore.exceptions.ClientError as error:
-                logger.error(f"Error encountered deleting file: {file['name']}")
+                logger.error(f"Error encountered deleting file: s3://{prefix}-l2p-granules/{dataset}/{file['name']}")
                 raise error
         else:
             checksum_errors.append(file["name"])
