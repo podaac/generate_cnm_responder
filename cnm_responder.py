@@ -20,17 +20,20 @@ import requests
 EFS = {
     "MODIS_A": "MODIS_L2P_CORE_NETCDF",
     "MODIS_T": "MODIS_L2P_CORE_NETCDF",
-    "VIIRS": "VIIRS_L2P_CORE_NETCDF"
+    "VIIRS": "VIIRS_L2P_CORE_NETCDF",
+    "JPSS1": "JPSS1_L2P_CORE_NETCDF"
 }
 S3 = {
     "MODIS_A": "aqua",
     "MODIS_T": "terra",
-    "VIIRS": "viirs"
+    "VIIRS": "viirs",
+    "JPSS1": "jpss1"
 }
 DATASET_DICT = {
     "MODIS_A": "MODIS_A-JPL-L2P-v2019.0",
     "MODIS_T": "MODIS_T-JPL-L2P-v2019.0",
-    "VIIRS": "VIIRS_NPP-JPL-L2P-v2016.2"
+    "VIIRS": "VIIRS_NPP-JPL-L2P-v2016.2",
+    "JPSS1": "VIIRS_JPSS1-JPL-L2P-v2016.2"
 }
 OUTPUT = pathlib.Path("/mnt/data")
 TOPIC_STRING = "batch-job-failure"
